@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require("express");
 const connectToMongo = require("./Connection");
 const cors = require("cors");
@@ -7,16 +6,20 @@ const path = require('path');
 const fs = require('fs');
 const Submission = require('./models/Submission');
 
-const app = express();
+// --- Environment Variables with Fallbacks ---
 const PORT = process.env.PORT || 4000;
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const DB_URL = process.env.DB_URL || "mongodb://localhost:27017/mydb";
 
-// Create) uploads directory if it doesn't exist
+const app = express();
+
+// Create uploads directory if it doesn't exist
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Molter cnfiguration for file uploads
+// Multer configuration for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -58,20 +61,19 @@ const upload = multer({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const FRONTEND_URL = process.env.FRONTEND_URL;
-
 app.use(
   cors({
     origin: FRONTEND_URL,
     credentials: true,
   })
 );
-// Connecting MognoDB
-connectToMongo(process.env.DB_URL)
+
+// Connecting MongoDB
+connectToMongo(DB_URL)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log("MongoDB Connection Error:", err));
 
-// API endpoint for form submissiong
+// API endpoint for form submission
 app.post('/upload', upload.fields([
   { name: 'cv', maxCount: 1 },
   { name: 'assignment', maxCount: 1 }
@@ -88,7 +90,6 @@ app.post('/upload', upload.fields([
       blockchainProject 
     } = req.body;
 
-    // Basic validation
     if (!fullName || !email || !req.files?.cv) {
       return res.status(400).json({ 
         success: false, 
@@ -96,7 +97,6 @@ app.post('/upload', upload.fields([
       });
     }
 
-    // Create new submission
     const submission = new Submission({
       fullName,
       email,
@@ -110,7 +110,6 @@ app.post('/upload', upload.fields([
       assignment: req.files.assignment?.[0]?.path
     });
 
-    // Save to database
     await submission.save();
 
     res.status(201).json({ 
@@ -146,4 +145,3 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log("Server is listening to PORT: " + PORT);
 });
-
